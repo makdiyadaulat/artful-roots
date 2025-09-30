@@ -2,6 +2,9 @@ import { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Palette, Menu, X, Search, User } from "lucide-react";
+import { useApp } from "@/contexts/AppContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -24,10 +27,12 @@ const Navbar = () => {
     { name: "About", path: "/about" },
   ];
 
+  const { user, logout } = useApp();
+
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-        isScrolled
+        (isScrolled || location.pathname !== "/")
           ? "bg-background/95 backdrop-blur-md shadow-md"
           : "bg-transparent"
       }`}
@@ -40,7 +45,11 @@ const Navbar = () => {
             className="flex items-center gap-2 text-2xl font-serif font-bold text-primary hover:text-accent transition-colors"
           >
             <Palette className="w-8 h-8" />
-            <span>ArtVerse</span>
+            <span className="inline-flex items-baseline gap-1">
+              <span>Rang</span>
+              <span className="text-accent">Manch</span>
+              <span>Gallery</span>
+            </span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -65,17 +74,57 @@ const Navbar = () => {
             <Button variant="ghost" size="icon">
               <Search className="w-5 h-5" />
             </Button>
-            <Link to="/auth">
-              <Button variant="outline" className="gap-2">
-                <User className="w-4 h-4" />
-                Login
-              </Button>
-            </Link>
-            <Link to="/dashboard">
-              <Button className="bg-primary hover:bg-primary/90">
-                Start Selling
-              </Button>
-            </Link>
+            {!user ? (
+              <Link to="/auth">
+                <Button variant="outline" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Login
+                </Button>
+              </Link>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="flex items-center gap-2 rounded-full focus:outline-none">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={user.avatar} alt={user.name} />
+                      <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={user.avatar} alt={user.name} />
+                        <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-medium leading-tight">{user.name}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                      </div>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {user.role === 'artist' && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard">Dashboard</Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile">Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout}>Logout</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            {user?.role === 'artist' && (
+              <Link to="/dashboard">
+                <Button className="bg-primary hover:bg-primary/90">
+                  Dashboard
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
@@ -112,17 +161,32 @@ const Navbar = () => {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t">
-                <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button variant="outline" className="w-full gap-2">
-                    <User className="w-4 h-4" />
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
-                  <Button className="w-full bg-primary hover:bg-primary/90">
-                    Start Selling
-                  </Button>
-                </Link>
+                {!user ? (
+                  <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)}>
+                    <Button variant="outline" className="w-full gap-2">
+                      <User className="w-4 h-4" />
+                      Login
+                    </Button>
+                  </Link>
+                ) : (
+                  <>
+                    {user.role === 'artist' && (
+                      <Link to="/dashboard" onClick={() => setIsMobileMenuOpen(false)}>
+                        <Button className="w-full bg-primary hover:bg-primary/90">Dashboard</Button>
+                      </Link>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        logout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                    >
+                      Logout
+                    </Button>
+                  </>
+                )}
               </div>
             </div>
           </div>

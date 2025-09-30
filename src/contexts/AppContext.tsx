@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { api, setAuthToken } from '@/lib/api';
 
 interface User {
   id: string;
@@ -27,6 +28,7 @@ interface AppContextType {
   login: (email: string, password: string, role: 'artist' | 'visitor') => void;
   logout: () => void;
   register: (name: string, email: string, password: string, role: 'artist' | 'visitor') => void;
+  updateUser: (updates: Partial<User>) => void;
   favorites: string[];
   toggleFavorite: (artworkId: string) => void;
   likes: string[];
@@ -46,48 +48,77 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [follows, setFollows] = useState<string[]>([]);
   const [inquiries, setInquiries] = useState<any[]>([]);
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const storedFavorites = localStorage.getItem('favorites');
-    const storedLikes = localStorage.getItem('likes');
-    const storedFollows = localStorage.getItem('follows');
-    const storedInquiries = localStorage.getItem('inquiries');
-
-    if (storedUser) setUser(JSON.parse(storedUser));
-    if (storedFavorites) setFavorites(JSON.parse(storedFavorites));
-    if (storedLikes) setLikes(JSON.parse(storedLikes));
-    if (storedFollows) setFollows(JSON.parse(storedFollows));
-    if (storedInquiries) setInquiries(JSON.parse(storedInquiries));
-  }, []);
-
-  const login = (email: string, password: string, role: 'artist' | 'visitor') => {
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name: email.split('@')[0],
-      email,
-      role,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
-    };
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+  const safeSet = (key: string, value: any) => {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch {}
   };
 
-  const register = (name: string, email: string, password: string, role: 'artist' | 'visitor') => {
-    const mockUser: User = {
-      id: Math.random().toString(36).substr(2, 9),
-      name,
-      email,
-      role,
-      avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+  const safeGet = (key: string) => {
+    try {
+      const v = localStorage.getItem(key);
+      return v ? JSON.parse(v) : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const storedUser = safeGet('user');
+    const storedFavorites = safeGet('favorites');
+    const storedLikes = safeGet('likes');
+    const storedFollows = safeGet('follows');
+    const storedInquiries = safeGet('inquiries');
+
+    if (storedUser) setUser(storedUser);
+    if (storedFavorites) setFavorites(storedFavorites);
+    if (storedLikes) setLikes(storedLikes);
+    if (storedFollows) setFollows(storedFollows);
+    if (storedInquiries) setInquiries(storedInquiries);
+  }, []);
+
+  const login = async (email: string, password: string, role?: 'artist' | 'visitor') => {
+    const { token, user: payloadUser } = await api.auth.login(email, password);
+    setAuthToken(token);
+    const next: User = {
+      id: payloadUser.id,
+      name: payloadUser.name,
+      email: payloadUser.email,
+      role: payloadUser.role,
+      avatar: payloadUser.avatar,
     };
-    setUser(mockUser);
-    localStorage.setItem('user', JSON.stringify(mockUser));
+    setUser(next);
+    safeSet('user', next);
+  };
+
+  const register = async (name: string, email: string, password: string, role: 'artist' | 'visitor') => {
+    const { token, user: payloadUser } = await api.auth.register(name, email, password, role);
+    setAuthToken(token);
+    const next: User = {
+      id: payloadUser.id,
+      name: payloadUser.name,
+      email: payloadUser.email,
+      role: payloadUser.role,
+      avatar: payloadUser.avatar,
+    };
+    setUser(next);
+    safeSet('user', next);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem('user');
+    setAuthToken(null);
+  };
+
+  const updateUser = (updates: Partial<User>) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates } as User;
+      safeSet('user', next);
+      return next;
+    });
   };
 
   const toggleFavorite = (artworkId: string) => {
@@ -95,7 +126,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const newFavorites = prev.includes(artworkId)
         ? prev.filter(id => id !== artworkId)
         : [...prev, artworkId];
-      localStorage.setItem('favorites', JSON.stringify(newFavorites));
+      safeSet('favorites', newFavorites);
       return newFavorites;
     });
   };
@@ -105,7 +136,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const newLikes = prev.includes(artworkId)
         ? prev.filter(id => id !== artworkId)
         : [...prev, artworkId];
-      localStorage.setItem('likes', JSON.stringify(newLikes));
+      safeSet('likes', newLikes);
       return newLikes;
     });
   };
@@ -115,7 +146,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const newFollows = prev.includes(artistId)
         ? prev.filter(id => id !== artistId)
         : [...prev, artistId];
-      localStorage.setItem('follows', JSON.stringify(newFollows));
+      safeSet('follows', newFollows);
       return newFollows;
     });
   };
@@ -123,7 +154,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const addInquiry = (inquiry: any) => {
     setInquiries(prev => {
       const newInquiries = [...prev, { ...inquiry, id: Date.now().toString() }];
-      localStorage.setItem('inquiries', JSON.stringify(newInquiries));
+      safeSet('inquiries', newInquiries);
       return newInquiries;
     });
   };
@@ -135,6 +166,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         login,
         logout,
         register,
+        updateUser,
         favorites,
         toggleFavorite,
         likes,

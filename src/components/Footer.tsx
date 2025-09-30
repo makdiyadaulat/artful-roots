@@ -24,7 +24,11 @@ const Footer = () => {
           <div className="space-y-4">
             <Link to="/" className="flex items-center gap-2 text-2xl font-serif font-bold text-primary">
               <Palette className="w-8 h-8" />
-              <span>ArtVerse</span>
+              <span className="inline-flex items-baseline gap-1">
+                <span>Rang</span>
+                <span className="text-accent">Manch</span>
+                <span>Gallery</span>
+              </span>
             </Link>
             <p className="text-sm text-muted-foreground">
               Empowering emerging artists to showcase their creativity and connect with art lovers worldwide.
@@ -101,7 +105,7 @@ const Footer = () => {
         </div>
 
         <div className="border-t mt-8 pt-8 text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 ArtVerse. All rights reserved. Built with passion for artists.</p>
+          <p>&copy; 2025 Rang Manch Gallery. All rights reserved. Built with passion for artists.</p>
         </div>
       </div>
     </footer>

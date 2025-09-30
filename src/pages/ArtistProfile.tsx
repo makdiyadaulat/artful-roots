@@ -1,12 +1,13 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MapPin, Users, Heart, Image, MessageCircle, Instagram, Globe, Twitter, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import ArtworkCard from '@/components/ArtworkCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useApp } from '@/contexts/AppContext';
-import { mockArtists, mockArtworks, mockExhibitions } from '@/data/mockData';
+import { api } from '@/lib/api';
 import ConnectArtistModal from '@/components/ConnectArtistModal';
 import { toast } from 'sonner';
 
@@ -14,14 +15,44 @@ const ArtistProfile = () => {
   const { id } = useParams();
   const { follows, toggleFollow } = useApp();
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [artist, setArtist] = useState<any | null>(null);
+  const [artistArtworks, setArtistArtworks] = useState<any[]>([]);
+  const [artistExhibitions, setArtistExhibitions] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
 
-  const artist = mockArtists.find(a => a.id === id);
-  const artistArtworks = mockArtworks.filter(a => a.artistId === id);
-  const artistExhibitions = mockExhibitions.filter(ex => 
-    artist?.exhibitions.some(exhibitionName => ex.title === exhibitionName)
-  );
+  useEffect(() => {
+    if (!id) return;
+    setIsLoading(true);
+    setNotFound(false);
+    Promise.all([
+      api.artists.get(id).catch(() => null),
+      api.artworks.list().catch(() => []),
+      api.exhibitions.list().catch(() => []),
+    ])
+      .then(([artistRes, artworks, exhibitions]) => {
+        if (!artistRes) {
+          setNotFound(true);
+          return;
+        }
+        setArtist(artistRes);
+        const normalizedArtworks = (artworks as any[]).map(a => ({ ...a, id: a.id ?? a._id }));
+        setArtistArtworks(normalizedArtworks.filter(a => String(a.artistId) === String(id)));
+        const normalizedEx = (exhibitions as any[]).map(e => ({ ...e, id: e.id ?? e._id }));
+        setArtistExhibitions(normalizedEx.filter(e => String(e.artistId) === String(id)));
+      })
+      .finally(() => setIsLoading(false));
+  }, [id]);
 
-  if (!artist) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-muted-foreground">Loading artist…</div>
+      </div>
+    );
+  }
+
+  if (notFound || !artist) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -46,7 +77,7 @@ const ArtistProfile = () => {
       {/* Banner */}
       <div 
         className="h-80 bg-cover bg-center relative"
-        style={{ backgroundImage: `url(${artist.banner})` }}
+        style={{ backgroundImage: `url(${artist.banner || '/placeholder.svg'})` }}
       >
         <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background"></div>
       </div>
@@ -58,7 +89,11 @@ const ArtistProfile = () => {
             <img
               src={artist.avatar}
               alt={artist.name}
-              className="w-48 h-48 rounded-full border-8 border-background shadow-2xl"
+              className="w-48 h-48 rounded-full border-8 border-background shadow-2xl object-cover"
+              onError={(e) => {
+                const t = e.currentTarget as HTMLImageElement;
+                if (!t.src.includes('/placeholder.svg')) t.src = '/placeholder.svg';
+              }}
             />
             
             <div className="flex-1">
@@ -78,14 +113,18 @@ const ArtistProfile = () => {
                   <Users className="h-4 w-4" />
                   <span>{artist.followers} followers</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Image className="h-4 w-4" />
-                  <span>{artist.artworksCount} artworks</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Heart className="h-4 w-4" />
-                  <span>{artist.totalLikes} total likes</span>
-                </div>
+                {typeof artist.artworksCount === 'number' && (
+                  <div className="flex items-center gap-2">
+                    <Image className="h-4 w-4" />
+                    <span>{artist.artworksCount} artworks</span>
+                  </div>
+                )}
+                {typeof artist.totalLikes === 'number' && (
+                  <div className="flex items-center gap-2">
+                    <Heart className="h-4 w-4" />
+                    <span>{artist.totalLikes} total likes</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-3">
@@ -99,21 +138,21 @@ const ArtistProfile = () => {
                 </Button>
 
                 {/* Social Links */}
-                {artist.social.instagram && (
+                {artist.social && artist.social.instagram && (
                   <Button variant="ghost" size="icon" asChild>
                     <a href={`https://instagram.com/${artist.social.instagram}`} target="_blank" rel="noopener noreferrer">
                       <Instagram className="h-5 w-5" />
                     </a>
                   </Button>
                 )}
-                {artist.social.website && (
+                {artist.social && artist.social.website && (
                   <Button variant="ghost" size="icon" asChild>
                     <a href={`https://${artist.social.website}`} target="_blank" rel="noopener noreferrer">
                       <Globe className="h-5 w-5" />
                     </a>
                   </Button>
                 )}
-                {artist.social.twitter && (
+                {artist.social && artist.social.twitter && (
                   <Button variant="ghost" size="icon" asChild>
                     <a href={`https://twitter.com/${artist.social.twitter}`} target="_blank" rel="noopener noreferrer">
                       <Twitter className="h-5 w-5" />
@@ -136,28 +175,16 @@ const ArtistProfile = () => {
           <TabsContent value="portfolio">
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {artistArtworks.map((artwork) => (
-                <Link key={artwork.id} to={`/artwork/${artwork.id}`}>
-                  <Card className="overflow-hidden hover:shadow-xl transition-all hover:scale-105">
-                    <img 
-                      src={artwork.image} 
-                      alt={artwork.title} 
-                      className="w-full h-72 object-cover"
-                    />
-                    <div className="p-4">
-                      <h3 className="font-medium mb-2">{artwork.title}</h3>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">{artwork.category}</p>
-                        <p className="font-bold">${artwork.price}</p>
-                      </div>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Heart className="h-4 w-4" />
-                          {artwork.likes}
-                        </span>
-                      </div>
-                    </div>
-                  </Card>
-                </Link>
+                <ArtworkCard
+                  key={artwork.id}
+                  id={artwork.id}
+                  title={artwork.title}
+                  artist={artwork.artist}
+                  image={artwork.image}
+                  category={artwork.category}
+                  price={artwork.price}
+                  likes={artwork.likes}
+                />
               ))}
             </div>
           </TabsContent>
@@ -170,7 +197,7 @@ const ArtistProfile = () => {
 
                 <h3 className="font-heading text-xl mb-4">Skills & Specialties</h3>
                 <div className="flex flex-wrap gap-2 mb-8">
-                  {artist.skills.map((skill) => (
+                  {(artist.skills || []).map((skill: string) => (
                     <Badge key={skill} variant="secondary" className="px-4 py-2">
                       {skill}
                     </Badge>
@@ -180,19 +207,19 @@ const ArtistProfile = () => {
                 <div className="grid sm:grid-cols-2 gap-6 pt-6 border-t">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Member Since</p>
-                    <p className="font-medium">{new Date(artist.joined).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+                    <p className="font-medium">{artist.joined ? new Date(artist.joined).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Total Followers</p>
-                    <p className="font-medium">{artist.followers.toLocaleString()}</p>
+                    <p className="font-medium">{typeof artist.followers === 'number' ? artist.followers.toLocaleString() : '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Artworks Published</p>
-                    <p className="font-medium">{artist.artworksCount}</p>
+                    <p className="font-medium">{typeof artist.artworksCount === 'number' ? artist.artworksCount : '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Total Appreciation</p>
-                    <p className="font-medium">{artist.totalLikes.toLocaleString()} likes</p>
+                    <p className="font-medium">{typeof artist.totalLikes === 'number' ? `${artist.totalLikes.toLocaleString()} likes` : '-'}</p>
                   </div>
                 </div>
               </Card>
@@ -209,11 +236,11 @@ const ArtistProfile = () => {
                     className="w-full h-48 object-cover"
                   />
                   <div className="p-6">
-                    <Badge className="mb-2">{exhibition.type}</Badge>
+                    {exhibition.type && <Badge className="mb-2">{exhibition.type}</Badge>}
                     <h3 className="font-heading text-xl mb-2">{exhibition.title}</h3>
                     <p className="text-sm text-muted-foreground mb-4">{exhibition.location}</p>
                     <p className="text-sm mb-4">
-                      {new Date(exhibition.date).toLocaleDateString()} - {new Date(exhibition.endDate).toLocaleDateString()}
+                      {exhibition.date && new Date(exhibition.date).toLocaleDateString()} - {exhibition.endDate && new Date(exhibition.endDate).toLocaleDateString()}
                     </p>
                     <Link to={`/exhibitions`}>
                       <Button variant="outline" size="sm">View Details</Button>
@@ -232,7 +259,7 @@ const ArtistProfile = () => {
         onClose={() => setShowConnectModal(false)}
         artistName={artist.name}
         artworkTitle="General Inquiry"
-        artistId={artist.id}
+        artistId={artist.id || artist._id}
       />
     </div>
   );

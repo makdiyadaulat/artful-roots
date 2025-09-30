@@ -1,19 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Search, MapPin, Users, Image as ImageIcon } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { mockArtists } from '@/data/mockData';
+import { api } from '@/lib/api';
 
 const Artists = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [artists, setArtists] = useState<any[]>([]);
+  useEffect(() => {
+    api.artists.list()
+      .then((list) => setArtists(Array.isArray(list) ? list : []))
+      .catch(() => setArtists([]));
+  }, []);
 
-  const filteredArtists = mockArtists.filter(artist =>
+  const filteredArtists = artists.filter(artist =>
     artist.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    artist.specialty.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    artist.location.toLowerCase().includes(searchQuery.toLowerCase())
+    (artist.specialty || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (artist.location || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   return (

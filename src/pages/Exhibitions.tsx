@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Calendar, MapPin, Users, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -6,7 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { mockExhibitions, mockArtworks } from '@/data/mockData';
+import { mockArtworks } from '@/data/mockData';
+import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Link } from 'react-router-dom';
@@ -16,8 +17,14 @@ const Exhibitions = () => {
   const [showRSVPModal, setShowRSVPModal] = useState(false);
   const [rsvpData, setRsvpData] = useState({ name: '', email: '', type: 'visitor' });
 
-  const upcomingExhibitions = mockExhibitions.filter(ex => ex.type === 'upcoming');
-  const pastExhibitions = mockExhibitions.filter(ex => ex.type === 'past');
+  const [exhibitions, setExhibitions] = useState<any[]>([]);
+  useEffect(() => {
+    api.exhibitions.list()
+      .then((list) => setExhibitions(Array.isArray(list) ? (list as any) : []))
+      .catch(() => setExhibitions([]));
+  }, []);
+  const upcomingExhibitions = exhibitions.filter(ex => ex.type === 'upcoming');
+  const pastExhibitions = exhibitions.filter(ex => ex.type === 'past');
 
   const getCountdown = (dateString: string) => {
     const date = new Date(dateString);
@@ -65,9 +72,7 @@ const Exhibitions = () => {
 
           <TabsContent value="upcoming" className="space-y-8">
             {upcomingExhibitions.map((exhibition) => {
-              const featuredArtworks = mockArtworks.filter(art => 
-                exhibition.artworks.includes(art.id)
-              );
+              const featuredArtworks: any[] = [];
 
               return (
                 <Card key={exhibition.id} className="overflow-hidden">

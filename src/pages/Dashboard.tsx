@@ -8,9 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useApp } from '@/contexts/AppContext';
+import { api } from '@/lib/api';
 import { mockArtworks, mockExhibitions } from '@/data/mockData';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 
 const Dashboard = () => {
   const { user, inquiries } = useApp();
@@ -24,6 +27,19 @@ const Dashboard = () => {
     price: '',
   });
   const [imagePreview, setImagePreview] = useState<string>('');
+
+  const [exhibitionImagePreview, setExhibitionImagePreview] = useState<string>('');
+  const [exhibitionData, setExhibitionData] = useState({
+    title: '',
+    location: '',
+    startDate: '',
+    endDate: '',
+    description: '',
+    type: 'upcoming' as 'upcoming' | 'past',
+    registrationOpen: true,
+    featured: false,
+    artworks: [] as string[],
+  });
 
   if (!user) {
     return <Navigate to="/auth" replace />;
@@ -50,26 +66,43 @@ const Dashboard = () => {
     }
   };
 
-  const handleUploadSubmit = (e: React.FormEvent) => {
+  const handleExhibitionImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setExhibitionImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!uploadData.title || !uploadData.category || !imagePreview) {
+    if (!uploadData.title || !uploadData.category || !imagePreview || !uploadData.price) {
       toast.error('Please fill in all required fields');
       return;
     }
-    toast.success('Artwork uploaded successfully!');
-    setUploadData({
-      title: '',
-      description: '',
-      category: '',
-      medium: '',
-      size: '',
-      price: '',
-    });
-    setImagePreview('');
+    try {
+      await api.artworks.create({
+        title: uploadData.title,
+        category: uploadData.category,
+        medium: uploadData.medium,
+        size: uploadData.size,
+        price: Number(uploadData.price),
+        image: imagePreview,
+        description: uploadData.description,
+      });
+      toast.success('Artwork uploaded successfully!');
+      setUploadData({ title: '', description: '', category: '', medium: '', size: '', price: '' });
+      setImagePreview('');
+    } catch (err: any) {
+      toast.error(err.message || 'Upload failed');
+    }
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex pt-20">
       {/* Sidebar */}
       <aside 
         className={`${
@@ -102,6 +135,12 @@ const Dashboard = () => {
               <a href="#stats">
                 <BarChart3 className="mr-3 h-4 w-4" />
                 Statistics
+              </a>
+            </Button>
+            <Button variant="ghost" className="w-full justify-start" asChild>
+              <a href="#host-exhibition">
+                <ImageIcon className="mr-3 h-4 w-4" />
+                Host Exhibition
               </a>
             </Button>
             <Button variant="ghost" className="w-full justify-start" asChild>
@@ -274,6 +313,122 @@ const Dashboard = () => {
                 <Button type="submit" size="lg">
                   <Upload className="mr-2 h-4 w-4" />
                   Upload Artwork
+                </Button>
+              </form>
+            </Card>
+          </section>
+
+          {/* Host Exhibition */}
+          <section id="host-exhibition">
+            <h2 className="font-heading text-3xl mb-6">Host Exhibition</h2>
+            <Card className="p-8">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!exhibitionData.title || !exhibitionData.location || !exhibitionData.startDate || !exhibitionData.endDate || !exhibitionImagePreview) {
+                    toast.error('Please fill in all required fields');
+                    return;
+                  }
+                  try {
+                    await api.exhibitions.create({
+                      title: exhibitionData.title,
+                      location: exhibitionData.location,
+                      date: exhibitionData.startDate,
+                      endDate: exhibitionData.endDate,
+                      description: exhibitionData.description,
+                      type: exhibitionData.type,
+                      registrationOpen: exhibitionData.registrationOpen,
+                      featured: exhibitionData.featured,
+                      image: exhibitionImagePreview,
+                      artworks: exhibitionData.artworks,
+                    });
+                    toast.success('Exhibition hosted successfully!');
+                    setExhibitionData({ title: '', location: '', startDate: '', endDate: '', description: '', type: 'upcoming', registrationOpen: true, featured: false, artworks: [] });
+                    setExhibitionImagePreview('');
+                  } catch (err: any) {
+                    toast.error(err.message || 'Host failed');
+                  }
+                }}
+                className="space-y-6"
+              >
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="ex-image">Exhibition Image *</Label>
+                    <div className="mt-2">
+                      <Input id="ex-image" type="file" accept="image/*" onChange={handleExhibitionImageUpload} className="cursor-pointer" />
+                      {exhibitionImagePreview && (
+                        <div className="mt-4">
+                          <img src={exhibitionImagePreview} alt="Exhibition Preview" className="w-full max-w-md h-48 object-cover rounded-lg" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="ex-title">Title *</Label>
+                    <Input id="ex-title" placeholder="Exhibition title" value={exhibitionData.title} onChange={(e) => setExhibitionData({ ...exhibitionData, title: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ex-location">Location *</Label>
+                    <Input id="ex-location" placeholder="Gallery / City" value={exhibitionData.location} onChange={(e) => setExhibitionData({ ...exhibitionData, location: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ex-start">Start Date *</Label>
+                    <Input id="ex-start" type="date" value={exhibitionData.startDate} onChange={(e) => setExhibitionData({ ...exhibitionData, startDate: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ex-end">End Date *</Label>
+                    <Input id="ex-end" type="date" value={exhibitionData.endDate} onChange={(e) => setExhibitionData({ ...exhibitionData, endDate: e.target.value })} />
+                  </div>
+                  <div>
+                    <Label htmlFor="ex-type">Type</Label>
+                    <Select value={exhibitionData.type} onValueChange={(value: 'upcoming' | 'past') => setExhibitionData({ ...exhibitionData, type: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="upcoming">Upcoming</SelectItem>
+                        <SelectItem value="past">Past</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <Switch id="ex-reg" checked={exhibitionData.registrationOpen} onCheckedChange={(v) => setExhibitionData({ ...exhibitionData, registrationOpen: v })} />
+                      <Label htmlFor="ex-reg">Registration Open</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch id="ex-featured" checked={exhibitionData.featured} onCheckedChange={(v) => setExhibitionData({ ...exhibitionData, featured: v })} />
+                      <Label htmlFor="ex-featured">Featured</Label>
+                    </div>
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="ex-description">Description</Label>
+                    <Textarea id="ex-description" rows={4} placeholder="Describe your exhibition..." value={exhibitionData.description} onChange={(e) => setExhibitionData({ ...exhibitionData, description: e.target.value })} />
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Include Artworks</Label>
+                  <div className="mt-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {userArtworks.map((art) => (
+                      <label key={art.id} className="flex items-center gap-2 p-3 border rounded-md">
+                        <Checkbox
+                          checked={exhibitionData.artworks.includes(art.id)}
+                          onCheckedChange={(v) => {
+                            setExhibitionData((prev) => {
+                              const set = new Set(prev.artworks);
+                              if (v) set.add(art.id); else set.delete(art.id);
+                              return { ...prev, artworks: Array.from(set) };
+                            });
+                          }}
+                        />
+                        <span className="text-sm">{art.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <Button type="submit">
+                  Host Exhibition
                 </Button>
               </form>
             </Card>

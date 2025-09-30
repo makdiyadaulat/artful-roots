@@ -1,11 +1,11 @@
 import { useParams, Link } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Heart, Share2, MessageCircle, ZoomIn, ChevronLeft, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { useApp } from '@/contexts/AppContext';
-import { mockArtworks, mockArtists } from '@/data/mockData';
+import { api } from '@/lib/api';
 import ConnectArtistModal from '@/components/ConnectArtistModal';
 import { toast } from 'sonner';
 
@@ -15,13 +15,38 @@ const ArtworkDetail = () => {
   const [showZoom, setShowZoom] = useState(false);
   const [comment, setComment] = useState('');
   const [localComments, setLocalComments] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
 
-  const artwork = mockArtworks.find(a => a.id === id);
-  const artist = mockArtists.find(a => a.id === artwork?.artistId);
-  const relatedArtworks = mockArtworks.filter(a => a.category === artwork?.category && a.id !== id).slice(0, 4);
+  const [artwork, setArtwork] = useState<any | null>(null);
+  const [artist, setArtist] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const relatedArtworks: any[] = [];
 
-  if (!artwork || !artist) {
+  useEffect(() => {
+    if (!id) return;
+    setIsLoading(true);
+    setNotFound(false);
+    api.artworks.get(id)
+      .then((a) => {
+        setArtwork(a);
+      })
+      .catch(() => {
+        setNotFound(true);
+      })
+      .finally(() => setIsLoading(false));
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center text-muted-foreground">Loading artwork…</div>
+      </div>
+    );
+  }
+
+  if (notFound || !artwork) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -53,24 +78,22 @@ const ArtworkDetail = () => {
     toast.success('Link copied to clipboard!');
   };
 
-  const handleAddComment = () => {
+  const handleAddComment = async () => {
     if (!user) {
       toast.error('Please login to comment');
       return;
     }
-    if (comment.trim()) {
-      setLocalComments([
-        ...localComments,
-        {
-          id: Date.now().toString(),
-          user: user.name,
-          avatar: user.avatar,
-          text: comment,
-          date: new Date().toISOString().split('T')[0],
-        },
-      ]);
+    if (!id || !comment.trim()) return;
+    try {
+      setIsSubmitting(true);
+      const created = await api.artworks.addComment(id, comment.trim());
+      setLocalComments([...localComments, created]);
       setComment('');
       toast.success('Comment added!');
+    } catch (e: any) {
+      toast.error(e?.message || 'Failed to add comment');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -118,22 +141,7 @@ const ArtworkDetail = () => {
           <div>
             <h1 className="font-heading text-4xl lg:text-5xl mb-4">{artwork.title}</h1>
             
-            {/* Artist Info */}
-            <Link to={`/artist/${artist.id}`}>
-              <Card className="p-4 mb-6 hover:shadow-lg transition-shadow cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <img
-                    src={artist.avatar}
-                    alt={artist.name}
-                    className="w-16 h-16 rounded-full"
-                  />
-                  <div>
-                    <p className="font-medium text-lg">{artist.name}</p>
-                    <p className="text-sm text-muted-foreground">{artist.specialty}</p>
-                  </div>
-                </div>
-              </Card>
-            </Link>
+            {/* Artist Info (pending backend endpoint) */}
 
             <div className="space-y-4 mb-8">
               <div className="grid grid-cols-2 gap-4">
@@ -204,9 +212,9 @@ const ArtworkDetail = () => {
                 className="mb-4"
                 rows={3}
               />
-              <Button onClick={handleAddComment}>
+              <Button onClick={handleAddComment} disabled={isSubmitting || !comment.trim()}>
                 <MessageCircle className="mr-2 h-4 w-4" />
-                Add Comment
+                {isSubmitting ? 'Adding…' : 'Add Comment'}
               </Button>
             </Card>
           ) : (
@@ -281,9 +289,9 @@ const ArtworkDetail = () => {
       <ConnectArtistModal
         isOpen={showConnectModal}
         onClose={() => setShowConnectModal(false)}
-        artistName={artist.name}
+        artistName={artwork.artist}
         artworkTitle={artwork.title}
-        artistId={artist.id}
+        artistId={artwork.artistId}
       />
     </div>
   );
