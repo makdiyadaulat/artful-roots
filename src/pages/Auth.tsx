@@ -8,6 +8,26 @@ import { Palette } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Auth = () => {
+  const navigate = useNavigate();
+  const { login, register } = useApp();
+  const [loginData, setLoginData] = useState({ email: "", password: "", role: "visitor" as const });
+  const [registerData, setRegisterData] = useState({ name: "", email: "", password: "", role: "visitor" as const });
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    login(loginData.email, loginData.password, loginData.role);
+    toast.success("Logged in successfully!");
+    navigate(loginData.role === "artist" ? "/dashboard" : "/");
+  };
+
+  const handleRegister = (e: React.FormEvent) => {
+    e.preventDefault();
+    register(registerData.name, registerData.email, registerData.password, registerData.role);
+    toast.success("Account created successfully!");
+    navigate(registerData.role === "artist" ? "/dashboard" : "/");
+  };
+
+const AuthPage = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -138,4 +158,4 @@ const Auth = () => {
   );
 };
 
-export default Auth;
+export default AuthPage;

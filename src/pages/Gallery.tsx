@@ -6,6 +6,15 @@ import { Search, Filter, Heart } from "lucide-react";
 
 const Gallery = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const { likes, toggleLike, favorites, toggleFavorite } = useApp();
+
+  const filteredArtworks = mockArtworks.filter(artwork => {
+    const matchesSearch = artwork.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         artwork.artist.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === "All" || artwork.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
 
   const artworks = [
     { id: 1, title: "Abstract Dreams", artist: "Sarah Mitchell", price: "$450", category: "Abstract", likes: 234 },
